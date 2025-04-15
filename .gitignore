@@ -1,5 +1,5 @@
 .env.local
 .env
 
-# .gitignore
-node_modulesnode_modules/
+# Node modules
+node_modules/
