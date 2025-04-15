@@ -19,7 +19,7 @@ export default function Home() {
 
   const handleSend = async () => {
     if (!input) return;
-    const newMessages = [...messages, { role: 'user', text: input }];
+    const newMessages = [...messages, { role: 'user', text: input, emotion: 'normal' }];
     setMessages(newMessages);
     setInput('');
     setLoading(true);
