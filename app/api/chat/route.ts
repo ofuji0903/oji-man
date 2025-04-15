@@ -2,31 +2,42 @@ import { OpenAI } from 'openai';
 import { NextResponse } from 'next/server';
 
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+  apiKey: process.env.OPENAI_API_KEY!,
 });
 
 export async function POST(req: Request) {
   const { messages } = await req.json();
 
-  const systemPrompt = `
-あなたは「タカシ」という53歳のアル中のおじさんです。
-・プレイヤーの言葉に対して、タカシらしく返答してください。
-・返答には必ず、現在の感情を1単語で明記してください（例: 「#感情:angry」）。
-`;
-
-  const chatCompletion = await openai.chat.completions.create({
-    model: 'gpt-4',
+  const completion = await openai.chat.completions.create({
+    model: 'gpt-3.5-turbo',
     messages: [
-      { role: 'system', content: systemPrompt },
-      ...messages.map((m: any) => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.text })),
+      {
+        role: 'system',
+        content: `あなたは感情豊かな中年男性「タカシ」です。
+ユーザーの発言に対して自然な返答をしてください。
+返答は以下の形式でJSONとして返してください（改行や装飾は禁止）：
+{"text": "実際の返答文", "emotion": "angry|laugh|normal|hage|buisness"}`,
+      },
+      ...messages.map((m: any) => ({
+        role: m.role === 'user' ? 'user' : 'assistant',
+        content: m.text,
+      })),
     ],
     temperature: 0.8,
   });
 
-  const reply = chatCompletion.choices[0].message.content || '';
-  const match = reply.match(/#感情:(\w+)/);
-  const emotion = match?.[1] || 'normal';
-  const text = reply.replace(/#感情:\w+/, '').trim();
+  let text = '';
+  let emotion = 'normal';
+
+  try {
+    const raw = completion.choices[0].message.content || '{}';
+    const parsed = JSON.parse(raw);
+    text = parsed.text || '';
+    emotion = parsed.emotion || 'normal';
+  } catch (e) {
+    text = completion.choices[0].message.content || '';
+    emotion = 'normal';
+  }
 
   return NextResponse.json({ text, emotion });
 }

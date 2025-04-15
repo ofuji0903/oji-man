@@ -1,3 +1,5 @@
+"use client";
+
 import { useState } from 'react';
 
 const EMOTION_TO_IMAGE = {
@@ -32,33 +34,44 @@ export default function Home() {
     setLoading(false);
   };
 
+  const fallbackImage = '/ch-takashi_normal.png';
   const currentEmotion = messages.findLast((m) => m.role === 'takashi')?.emotion || 'normal';
+  const currentImage = EMOTION_TO_IMAGE[currentEmotion] || fallbackImage;
 
   return (
-    <div className="min-h-screen bg-cover bg-center" style={{ backgroundImage: "url('/BG_town.png')" }}>
-      <div className="max-w-3xl mx-auto px-4 py-8">
-        <div className="flex justify-center mb-4">
-          <img src={EMOTION_TO_IMAGE[currentEmotion]} className="h-96 object-contain" alt="たかし" />
+    <div
+      className="w-screen h-screen bg-no-repeat bg-cover bg-center"
+      style={{ backgroundImage: "url('/BG_town.png')", backgroundSize: '100% 100%' }}
+    >
+      <div className="flex flex-col h-full max-w-4xl mx-auto px-4 py-4">
+        <div className="flex-1 flex items-center justify-center">
+          <img
+            src={currentImage}
+            className="max-h-[60vh] object-contain mx-auto"
+            alt="たかし"
+          />
         </div>
 
-        <div className="bg-green-800 text-white p-4 rounded mb-4 min-h-[120px]">
+        <div className="bg-black bg-opacity-70 text-white p-4 rounded mb-4 min-h-[100px] max-h-[25vh] overflow-y-auto">
           {messages.map((m, i) => (
             <div key={i} className={m.role === 'user' ? 'text-right' : 'text-left'}>
-              <span className="block">{m.role === 'user' ? 'あなた' : 'タカシ'}：{m.text}</span>
+              <span className="block whitespace-pre-wrap text-sm">
+                {m.role === 'user' ? 'あなた' : 'タカシ'}：{m.text}
+              </span>
             </div>
           ))}
         </div>
 
         <div className="flex gap-2">
           <input
-            className="flex-1 p-2 border border-gray-400"
+            className="flex-1 p-2 border border-gray-400 rounded bg-white text-black"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="入力してね"
           />
           <button
             onClick={handleSend}
-            className="bg-green-700 text-white px-4 py-2 disabled:opacity-50"
+            className="bg-green-700 text-white px-4 py-2 rounded disabled:opacity-50"
             disabled={loading}
           >
             {loading ? '送信中…' : '送信'}
@@ -66,5 +79,9 @@ export default function Home() {
         </div>
       </div>
     </div>
+    
+
+
+    
   );
 }
