@@ -1,43 +1,47 @@
-import { OpenAI } from 'openai';
-import { NextResponse } from 'next/server';
+// app/api/chat/route.ts
+import { OpenAI } from "openai";
+import { NextResponse } from "next/server";
 
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY!,
+  apiKey: process.env.OPENAI_API_KEY,
 });
 
 export async function POST(req: Request) {
-  const { messages } = await req.json();
+  const { messages, trust } = await req.json();
 
-  const completion = await openai.chat.completions.create({
-    model: 'gpt-3.5-turbo',
+  const systemPrompt = `
+あなたは「タカシ」という名前の中年男性で、かつてアルコール依存症でしたが、今は更生を目指しています。
+以下の会話履歴と現在の信頼度（数値: ${trust}）を踏まえて、感情のこもったリアルな返答を生成してください。
+ユーザーの言動に対して、怒る・落ち込む・励まされるなどの感情変化を自然に反映してください。
+信頼度が低いうちは怒りっぽく卑屈な回答。信頼度が高くなると褒め言葉も素直に受け取ってください。
+また、返答ごとに「信頼度を +5 / 0 / -5」どれかで変化させてください。
+出力は以下のJSON形式でしてください：
+{
+  "reply": "タカシの返答",
+  "emotion": "normal | angry | laugh | hage | buisness",
+  "trustChange": 5 or 0 or -5
+}`;
+
+  const userMessages = messages.map((msg: any) => `${msg.role}：${msg.text}`).join("\n");
+
+  const prompt = `${systemPrompt}\n\n会話履歴：\n${userMessages}`;
+
+  const chat = await openai.chat.completions.create({
+    model: "gpt-4", // もしくは gpt-4-turbo 等コスト抑制モデル
     messages: [
-      {
-        role: 'system',
-        content: `あなたは感情豊かな中年男性「タカシ」です。
-ユーザーの発言に対して自然な返答をしてください。
-返答は以下の形式でJSONとして返してください（改行や装飾は禁止）：
-{"text": "実際の返答文", "emotion": "angry|laugh|normal|hage|buisness"}`,
-      },
-      ...messages.map((m: any) => ({
-        role: m.role === 'user' ? 'user' : 'assistant',
-        content: m.text,
-      })),
+      { role: "system", content: systemPrompt },
+      { role: "user", content: prompt },
     ],
     temperature: 0.8,
   });
 
-  let text = '';
-  let emotion = 'normal';
+  const response = chat.choices[0].message.content;
 
   try {
-    const raw = completion.choices[0].message.content || '{}';
-    const parsed = JSON.parse(raw);
-    text = parsed.text || '';
-    emotion = parsed.emotion || 'normal';
+    const parsed = JSON.parse(response || "{}");
+    return NextResponse.json(parsed);
   } catch (e) {
-    text = completion.choices[0].message.content || '';
-    emotion = 'normal';
+    console.error("JSON parse error:", e);
+    return NextResponse.json({ reply: "……。", emotion: "normal", trustChange: 0 });
   }
-
-  return NextResponse.json({ text, emotion });
 }

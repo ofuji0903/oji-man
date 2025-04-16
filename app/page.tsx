@@ -1,87 +1,110 @@
 "use client";
 
-import { useState } from 'react';
+import Image from "next/image";
+import { useEffect, useState } from "react";
+import Gauge from "../components/Gauge";
 
-const EMOTION_TO_IMAGE = {
-  normal: '/ch-takashi_normal.png',
-  angry: '/ch-takashi_angry.png',
-  laugh: '/ch-takashi_laugh.png',
-  hage: '/ch-takashi_hage.png',
-  buisness: '/ch-takashi_buisness.png',
+const EMOTION_TO_IMAGE: Record<string, string> = {
+  normal: "/ch-takashi_normal.png",
+  angry: "/ch-takashi_angry.png",
+  laugh: "/ch-takashi_laugh.png",
+  hage: "/ch-takashi_hage.png",
+  buisness: "/ch-takashi_buisness.png",
 };
 
 export default function Home() {
-  const [messages, setMessages] = useState([
-    { role: 'takashi', text: 'また…酒飲んじまったよ…', emotion: 'normal' },
-  ]);
-  const [input, setInput] = useState('');
+  const [messages, setMessages] = useState<{ role: string; text: string }[]>([]);
+  const [input, setInput] = useState("");
+  const [emotion, setEmotion] = useState("normal");
+  const [trust, setTrust] = useState(20);
   const [loading, setLoading] = useState(false);
 
-  const handleSend = async () => {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     if (!input) return;
-    const newMessages = [...messages, { role: 'user', text: input, emotion: 'normal' }];
+
+    const newMessages = [...messages, { role: "user", text: input }];
     setMessages(newMessages);
-    setInput('');
+    setInput("");
     setLoading(true);
 
-    const res = await fetch('/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messages: newMessages }),
-    });
-    const data = await res.json();
-    setMessages([...newMessages, { role: 'takashi', text: data.text, emotion: data.emotion }]);
-    setLoading(false);
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: newMessages, trust }),
+      });
+      const data = await res.json();
+      console.log("APIレスポンス:", data); //コンソールにAPI回答をログ出力
+      if (data.reply) {
+        setMessages((prev) => [...prev, { role: "takashi", text: data.reply }]);
+        if (data.emotion && EMOTION_TO_IMAGE[data.emotion]) {
+          setEmotion(data.emotion);
+        }
+        if (typeof data.trustChange === "number") {
+          setTrust((prev) => Math.max(0, Math.min(100, prev + data.trustChange)));
+        }
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const fallbackImage = '/ch-takashi_normal.png';
-  const currentEmotion = messages.findLast((m) => m.role === 'takashi')?.emotion || 'normal';
-  const currentImage = EMOTION_TO_IMAGE[currentEmotion] || fallbackImage;
-
   return (
-    <div
-      className="w-screen h-screen bg-no-repeat bg-cover bg-center"
-      style={{ backgroundImage: "url('/BG_town.png')", backgroundSize: '100% 100%' }}
-    >
-      <div className="flex flex-col h-full max-w-4xl mx-auto px-4 py-4">
-        <div className="flex-1 flex items-center justify-center">
-          <img
-            src={currentImage}
-            className="max-h-[60vh] object-contain mx-auto"
-            alt="たかし"
-          />
-        </div>
+    <main className="relative w-full h-screen bg-black text-white overflow-hidden">
+      {/* 背景画像 */}
+      <Image
+        src="/BG_town.png"
+        alt="Background"
+        layout="fill"
+        objectFit="cover"
+        className="z-0"
+      />
 
-        <div className="bg-black bg-opacity-70 text-white p-4 rounded mb-4 min-h-[100px] max-h-[25vh] overflow-y-auto">
-          {messages.map((m, i) => (
-            <div key={i} className={m.role === 'user' ? 'text-right' : 'text-left'}>
-              <span className="block whitespace-pre-wrap text-sm">
-                {m.role === 'user' ? 'あなた' : 'タカシ'}：{m.text}
-              </span>
+      {/* 信頼度ゲージ */}
+      <Gauge trust={trust} />
+
+      {/* タカシ立ち絵 */}
+      <div className="absolute bottom-[240px] w-full flex justify-center z-10">
+        {EMOTION_TO_IMAGE[emotion] && (
+          <Image
+            src={EMOTION_TO_IMAGE[emotion]}
+            alt="タカシ"
+            width={300}
+            height={300}
+          />
+        )}
+      </div>
+
+      {/* 会話ウィンドウ */}
+      <div className="absolute bottom-[70px] left-1/2 transform -translate-x-1/2 w-full max-w-4xl px-4 z-20">
+        <div className="bg-black bg-opacity-60 p-4 rounded-lg h-32 overflow-y-auto text-sm">
+          {messages.map((msg, idx) => (
+            <div key={idx}>
+              <strong className="mr-2">{msg.role === "user" ? "あなた" : "タカシ"}:</strong>
+              {msg.text}
             </div>
           ))}
         </div>
-
-        <div className="flex gap-2">
+        <form onSubmit={handleSubmit} className="flex items-center gap-2 mt-2">
           <input
-            className="flex-1 p-2 border border-gray-400 rounded bg-white text-black"
+            type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="入力してね"
+            className="flex-grow p-2 rounded-md text-black"
           />
           <button
-            onClick={handleSend}
-            className="bg-green-700 text-white px-4 py-2 rounded disabled:opacity-50"
+            type="submit"
+            className="bg-green-600 px-4 py-2 rounded-md text-white disabled:opacity-50"
             disabled={loading}
           >
-            {loading ? '送信中…' : '送信'}
+            送信
           </button>
-        </div>
+        </form>
       </div>
-    </div>
-    
-
-
-    
+    </main>
   );
 }
